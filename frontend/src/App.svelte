@@ -8,7 +8,7 @@
   let tempC = 110
   let minutes = 10
   let error = ''
-  let showForm = true
+  let showForm = false
 
   async function api(path, options = {}) {
     const res = await fetch(path, {
@@ -32,9 +32,17 @@
     role = data.role
     localStorage.setItem('herb_token', token)
     localStorage.setItem('herb_role', role)
-    const flag = await api('/api/auth/form-flag')
-    showForm = flag.show_form
-    await load()
+    await restore()
+  }
+
+  async function restore() {
+    try {
+      const flag = await api('/api/auth/form-flag')
+      showForm = flag.show_form
+      await load()
+    } catch {
+      leave()
+    }
   }
 
   async function load() {
@@ -54,7 +62,6 @@
       await load()
     } catch (err) {
       error = err.message
-      await load()
     }
   }
 
@@ -62,9 +69,10 @@
     localStorage.clear()
     token = ''
     role = ''
+    showForm = false
   }
 
-  if (token) load()
+  if (token) restore()
 </script>
 
 <main>
