@@ -8,7 +8,8 @@
   let tempC = 110
   let minutes = 10
   let error = ''
-  let showForm = true
+  let showForm = false
+  let allowRefreshAfterReject = false
 
   async function api(path, options = {}) {
     const res = await fetch(path, {
@@ -23,6 +24,12 @@
     return data
   }
 
+  async function syncFlag() {
+    const flag = await api('/api/auth/form-flag')
+    showForm = flag.show_form
+    allowRefreshAfterReject = flag.allow_refresh_after_reject
+  }
+
   async function enter() {
     const data = await api('/api/auth/login', {
       method: 'POST',
@@ -32,8 +39,7 @@
     role = data.role
     localStorage.setItem('herb_token', token)
     localStorage.setItem('herb_role', role)
-    const flag = await api('/api/auth/form-flag')
-    showForm = flag.show_form
+    await syncFlag()
     await load()
   }
 
@@ -54,7 +60,8 @@
       await load()
     } catch (err) {
       error = err.message
-      await load()
+      // 只读会话写入被拒后不再刷新列表，避免拒写后列表涨行。
+      if (allowRefreshAfterReject) await load()
     }
   }
 
@@ -62,9 +69,17 @@
     localStorage.clear()
     token = ''
     role = ''
+    showForm = false
   }
 
-  if (token) load()
+  // 已有会话刷新页面：先同步表单开关再拉列表，表单不得先画出来。
+  if (token) {
+    syncFlag().then(load).catch(() => {
+      localStorage.clear()
+      token = ''
+      role = ''
+    })
+  }
 </script>
 
 <main>

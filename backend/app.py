@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 from psycopg.rows import dict_row
 
 from rules import judge
-from checker_pass import allow_write, show_form
+from checker_pass import allow_list_refresh_after_reject, allow_write, show_form
 
 SECRET = os.environ.get("JWT_SECRET", "herb-process-dev-secret")
 DSN = os.environ.get("DATABASE_URL", "postgresql://app:app@localhost:54393/herb")
@@ -52,7 +52,9 @@ def current_user(credentials: HTTPAuthorizationCredentials | None = Depends(secu
         raise HTTPException(status_code=401, detail="无效令牌") from exc
     if payload.get("sub") not in USERS:
         raise HTTPException(status_code=401, detail="无效令牌")
-    return {"username": payload["sub"], "role": payload.get("role")}
+    username = payload["sub"]
+    # 角色以服务端用户表为准，不信任令牌里的角色声明。
+    return {"username": username, "role": USERS[username]["role"]}
 
 
 def require_writer(user: dict = Depends(current_user)) -> dict:
@@ -112,7 +114,10 @@ def login(body: LoginIn):
 
 @app.get("/api/auth/form-flag")
 def form_flag(user: dict = Depends(current_user)):
-    return {"show_form": show_form(user["role"])}
+    return {
+        "show_form": show_form(user["role"]),
+        "allow_refresh_after_reject": allow_list_refresh_after_reject(user["role"]),
+    }
 
 
 @app.get("/api/batches")
